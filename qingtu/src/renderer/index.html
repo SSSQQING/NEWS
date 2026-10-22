@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: qingtu:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>轻图</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="titlebar">
+    <div class="brand">
+      <img class="brand-logo" src="assets/logo.svg" alt="">
+      <span class="brand-name">轻图</span>
+      <span class="brand-tag">批量压缩 · 裁切</span>
+    </div>
+    <div class="titlebar-center">
+      <button class="preset-trigger" id="presetTrigger" type="button">
+        <i data-icon="bookmark" data-size="16"></i>
+        <span id="presetLabel">场景预设</span>
+        <i data-icon="chevronDown" data-size="14"></i>
+      </button>
+    </div>
+    <div class="titlebar-actions">
+      <button class="icon-btn" id="themeBtn" type="button" title="切换主题"></button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="workspace">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button class="btn" id="addFilesBtn" type="button"><i data-icon="images"></i>添加图片</button>
+          <button class="btn" id="addFolderBtn" type="button"><i data-icon="folderPlus"></i>添加文件夹</button>
+        </div>
+        <div class="toolbar-group">
+          <span class="chip" id="countChip">0 张</span>
+          <button class="btn ghost" id="clearBtn" type="button"><i data-icon="trash"></i>清空</button>
+        </div>
+      </div>
+
+      <div class="content" id="content">
+        <div class="empty" id="emptyState">
+          <div class="empty-art" aria-hidden="true">
+            <div class="empty-card c1"></div>
+            <div class="empty-card c2"></div>
+            <div class="empty-card c3"><i data-icon="image" data-size="34"></i></div>
+          </div>
+          <h2>把图片或文件夹拖进来</h2>
+          <p>支持 JPG、PNG、WebP、AVIF、JPEG XL、GIF、TIFF、SVG，文件夹会自动扫描子目录</p>
+          <div class="empty-actions">
+            <button class="btn primary" id="emptyAddFiles" type="button"><i data-icon="images"></i>选择图片</button>
+            <button class="btn" id="emptyAddFolder" type="button"><i data-icon="folderPlus"></i>选择文件夹</button>
+          </div>
+          <p class="empty-hint"><kbd>Ctrl</kbd> + <kbd>O</kbd> 快速添加</p>
+        </div>
+        <div class="grid" id="grid"></div>
+      </div>
+
+      <footer class="actionbar">
+        <div class="ab-stats">
+          <div class="ab-title" id="abTitle">还没有图片</div>
+          <div class="ab-sub" id="abSub">拖进来就能开始</div>
+        </div>
+        <div class="ab-progress" id="abProgress" hidden>
+          <div class="bar"><span id="abBar"></span></div>
+          <span class="ab-pct" id="abPct">0%</span>
+        </div>
+        <div class="ab-buttons">
+          <button class="btn ghost" id="openOutBtn" type="button" hidden><i data-icon="folderOpen"></i>打开输出文件夹</button>
+          <button class="btn primary lg" id="startBtn" type="button"><i data-icon="play"></i><span>开始压缩</span></button>
+        </div>
+      </footer>
+    </section>
+
+    <aside class="sidebar" id="sidebar">
+      <!-- 输出格式 -->
+      <section class="panel">
+        <header class="panel-head"><i data-icon="layers"></i><h3>输出格式</h3></header>
+        <div class="format-grid" data-seg="format">
+          <button type="button" class="format-card" data-value="original"><b>原格式</b><small>保持不变</small></button>
+          <button type="button" class="format-card" data-value="jpeg"><b>JPG</b><small>哪都能打开</small></button>
+          <button type="button" class="format-card" data-value="png"><b>PNG</b><small>无损 · 透明</small></button>
+          <button type="button" class="format-card" data-value="webp"><b>WebP</b><small>网页通用</small></button>
+          <button type="button" class="format-card" data-value="avif"><b>AVIF</b><small>体积最小</small><span class="format-badge">推荐</span></button>
+          <button type="button" class="format-card" data-value="jxl"><b>JPEG XL</b><small>高保真</small><span class="format-badge new">新</span></button>
+        </div>
+        <p class="note" id="formatNote"></p>
+      </section>
+
+      <!-- 画质 -->
+      <section class="panel">
+        <header class="panel-head"><i data-icon="sparkles"></i><h3>画质</h3></header>
+        <div class="seg" data-seg="qualityMode">
+          <button type="button" data-value="smart">智能画质</button>
+          <button type="button" data-value="manual">手动参数</button>
+        </div>
+        <div id="smartBox">
+          <div class="level-grid" data-seg="target">
+            <button type="button" class="level-card" data-value="lossless"><b>视觉无损</b><small>≥ 90 分</small></button>
+            <button type="button" class="level-card" data-value="high"><b>高画质</b><small>≥ 82 分</small></button>
+            <button type="button" class="level-card" data-value="balanced"><b>均衡</b><small>≥ 75 分</small></button>
+            <button type="button" class="level-card" data-value="small"><b>小体积</b><small>≥ 65 分</small></button>
+          </div>
+          <p class="note">用 SSIMULACRA 2 感知评分给每张图打分，自动找“刚好达标”的最低参数：看着一样好，能省就省。</p>
+        </div>
+        <div id="manualBox" class="field">
+          <div class="field-row">
+            <label for="qualityRange" id="qualityLabel">画质</label>
+            <output id="qualityValue">85</output>
+          </div>
+          <input type="range" id="qualityRange" min="1" max="100" step="1" data-bind="quality">
+        </div>
+
+        <label class="toggle-row">
+          <span>限制文件大小</span>
+          <span class="switch"><input type="checkbox" data-bind="limitSize"><i></i></span>
+        </label>
+        <div id="sizeLimitBox" class="sub-box">
+          <div class="input-group">
+            <input type="number" min="1" step="1" data-bind="maxSize" placeholder="500">
+            <div class="seg mini" data-seg="sizeUnit">
+              <button type="button" data-value="KB">KB</button>
+              <button type="button" data-value="MB">MB</button>
+            </div>
+          </div>
+          <label class="toggle-row compact" id="downscaleRow">
+            <span>画质压到底还超标时，自动缩小尺寸</span>
+            <span class="switch"><input type="checkbox" data-bind="allowDownscale"><i></i></span>
+          </label>
+          <p class="note" id="downscaleNote" hidden>精确尺寸模式下只降画质、不改尺寸。</p>
+        </div>
+
+        <details class="more">
+          <summary>更多选项</summary>
+          <label class="toggle-row compact">
+            <span>保留 EXIF 等元数据<small>拍摄参数、GPS 定位等，默认去掉保护隐私</small></span>
+            <span class="switch"><input type="checkbox" data-bind="keepMetadata"><i></i></span>
+          </label>
+          <label class="toggle-row compact">
+            <span>压完反而变大时保留原图</span>
+            <span class="switch"><input type="checkbox" data-bind="keepSmaller"><i></i></span>
+          </label>
+          <label class="toggle-row compact">
+            <span>保留手机 HDR 照片的增益图<small>JPG → JPG 时生效（实验功能）</small></span>
+            <span class="switch"><input type="checkbox" data-bind="keepHdr"><i></i></span>
+          </label>
+          <label class="toggle-row compact" id="jxlLosslessRow">
+            <span>JPG 转 JPEG XL 时无损转码<small>不改尺寸时生效，体积约小 20%，可还原原图</small></span>
+            <span class="switch"><input type="checkbox" data-bind="jxlFromJpeg"><i></i></span>
+          </label>
+        </details>
+      </section>
+
+      <!-- 尺寸与裁切 -->
+      <section class="panel">
+        <header class="panel-head"><i data-icon="crop"></i><h3>尺寸与裁切</h3></header>
+        <div class="mode-grid" data-seg="resize.mode">
+          <button type="button" class="mode-card" data-value="none"><i data-icon="modeNone" data-size="22"></i><span>不调整</span></button>
+          <button type="button" class="mode-card" data-value="cover"><i data-icon="modeCover" data-size="22"></i><span>裁切填满</span></button>
+          <button type="button" class="mode-card" data-value="contain"><i data-icon="modeContain" data-size="22"></i><span>留白适应</span></button>
+          <button type="button" class="mode-card" data-value="inside"><i data-icon="modeInside" data-size="22"></i><span>限制最大</span></button>
+          <button type="button" class="mode-card" data-value="fill"><i data-icon="modeFill" data-size="22"></i><span>拉伸</span></button>
+          <button type="button" class="mode-card" data-value="percent"><i data-icon="modePercent" data-size="22"></i><span>按比例</span></button>
+        </div>
+        <p class="note" id="modeNote"></p>
+
+        <div id="dimsBox">
+          <div class="dims">
+            <label class="dim"><span>宽</span><input type="number" min="1" step="1" data-bind="resize.width" placeholder="不限"><em>px</em></label>
+            <button type="button" class="icon-btn small" id="swapDims" title="交换宽高"><i data-icon="swap" data-size="16"></i></button>
+            <label class="dim"><span>高</span><input type="number" min="1" step="1" data-bind="resize.height" placeholder="不限"><em>px</em></label>
+          </div>
+          <div class="chips" id="sizeChips">
+            <button type="button" class="chip-btn" data-size="1920x1080">1920×1080</button>
+            <button type="button" class="chip-btn" data-size="1080x1080">1080×1080</button>
+            <button type="button" class="chip-btn" data-size="800x800">800×800</button>
+            <button type="button" class="chip-btn" data-size="1080x1440">1080×1440</button>
+            <button type="button" class="chip-btn" data-size="900x383">900×383</button>
+            <button type="button" class="chip-btn" data-size="295x413">一寸 295×413</button>
+          </div>
+        </div>
+
+        <div id="percentBox" class="field">
+          <div class="field-row"><label for="percentInput">缩放比例</label><output id="percentValue">50%</output></div>
+          <input type="range" id="percentInput" min="5" max="200" step="5" data-bind="resize.percent">
+        </div>
+
+        <div id="anchorBox" class="field">
+          <div class="field-row"><label>裁切位置</label></div>
+          <div class="anchor-wrap">
+            <div class="anchor-grid" data-seg="resize.anchor">
+              <button type="button" data-value="northwest" title="左上"></button>
+              <button type="button" data-value="north" title="上"></button>
+              <button type="button" data-value="northeast" title="右上"></button>
+              <button type="button" data-value="west" title="左"></button>
+              <button type="button" data-value="centre" title="居中"></button>
+              <button type="button" data-value="east" title="右"></button>
+              <button type="button" data-value="southwest" title="左下"></button>
+              <button type="button" data-value="south" title="下"></button>
+              <button type="button" data-value="southeast" title="右下"></button>
+            </div>
+            <div class="seg vertical" data-seg="resize.anchor">
+              <button type="button" data-value="attention"><i data-icon="scan" data-size="16"></i>智能识别主体</button>
+            </div>
+          </div>
+        </div>
+
+        <label class="toggle-row compact" id="noEnlargeRow">
+          <span>小图不放大</span>
+          <span class="switch"><input type="checkbox" data-bind="resize.noEnlarge"><i></i></span>
+        </label>
+
+        <div id="bgBox" class="field">
+          <div class="field-row"><label>背景色<small id="bgHint">留白和透明区域</small></label></div>
+          <div class="bg-row">
+            <label class="color-input"><input type="color" data-bind="resize.bg"><span id="bgValue">#FFFFFF</span></label>
+            <label class="toggle-row compact inline" id="transparentRow">
+              <span>透明</span>
+              <span class="switch"><input type="checkbox" data-bind="resize.transparent"><i></i></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- 输出位置 -->
+      <section class="panel">
+        <header class="panel-head"><i data-icon="export"></i><h3>输出位置</h3></header>
+        <div class="seg" data-seg="output.mode">
+          <button type="button" data-value="subfolder">原图旁新建</button>
+          <button type="button" data-value="folder">指定文件夹</button>
+          <button type="button" data-value="overwrite">覆盖原图</button>
+        </div>
+
+        <div id="subfolderBox" class="field">
+          <div class="field-row"><label>子文件夹名</label></div>
+          <div class="input-prefix"><i data-icon="folder" data-size="16"></i><input type="text" data-bind="output.subfolder" placeholder="compressed" spellcheck="false"></div>
+        </div>
+
+        <div id="folderBox" class="field">
+          <button type="button" class="path-picker" id="pickDirBtn">
+            <i data-icon="folderOpen" data-size="18"></i>
+            <span id="dirLabel">选择导出文件夹…</span>
+          </button>
+          <label class="toggle-row compact">
+            <span>保留原来的子文件夹结构</span>
+            <span class="switch"><input type="checkbox" data-bind="output.keepStructure"><i></i></span>
+          </label>
+        </div>
+
+        <div id="overwriteBox" class="field">
+          <div class="warn"><i data-icon="alert" data-size="16"></i><span>原文件会被替换。建议开着下面这个开关，翻车了还能从回收站捞回来。</span></div>
+          <label class="toggle-row compact">
+            <span>原图先移入回收站</span>
+            <span class="switch"><input type="checkbox" data-bind="output.trashOriginal"><i></i></span>
+          </label>
+        </div>
+
+        <div id="conflictBox" class="field">
+          <div class="field-row"><label>遇到同名文件</label></div>
+          <div class="seg" data-seg="output.conflict">
+            <button type="button" data-value="rename">自动改名</button>
+            <button type="button" data-value="skip">跳过</button>
+            <button type="button" data-value="overwrite">覆盖</button>
+          </div>
+        </div>
+
+        <label class="toggle-row compact">
+          <span>完成后打开输出文件夹</span>
+          <span class="switch"><input type="checkbox" data-bind="output.openWhenDone"><i></i></span>
+        </label>
+      </section>
+
+      <!-- 文件命名 -->
+      <section class="panel" id="namingPanel">
+        <header class="panel-head"><i data-icon="pen"></i><h3>文件命名</h3></header>
+        <div class="seg" data-seg="naming.mode">
+          <button type="button" data-value="original">原文件名</button>
+          <button type="button" data-value="default">默认</button>
+          <button type="button" data-value="custom">自定义</button>
+        </div>
+        <div id="customNameBox" class="field">
+          <input type="text" id="templateInput" data-bind="naming.template" placeholder="例如：商品图_{n}" spellcheck="false">
+          <div class="chips" id="tokenChips"></div>
+          <div class="inline-fields">
+            <label>起始序号<input type="number" min="0" step="1" data-bind="naming.start"></label>
+            <label>序号位数<input type="number" min="1" max="10" step="1" data-bind="naming.digits"></label>
+          </div>
+        </div>
+        <div class="name-preview" id="namePreview"></div>
+        <p class="note" id="overwriteNameNote" hidden>覆盖模式沿用原文件名，换格式时只改扩展名。</p>
+      </section>
+
+      <p class="sidebar-foot" id="versionLabel"></p>
+    </aside>
+  </main>
+
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-box"><i data-icon="images" data-size="40"></i><b>松手就加进来</b><span>图片和文件夹都行</span></div>
+  </div>
+
+  <div class="popover" id="presetMenu" hidden></div>
+
+  <div class="modal" id="compareModal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="compare-dialog" role="dialog" aria-modal="true">
+      <header class="compare-head">
+        <div class="compare-name" id="cmpName"></div>
+        <div class="compare-stats">
+          <div class="stat"><span>原图</span><b id="cmpIn"></b><em id="cmpInDim"></em></div>
+          <div class="stat-arrow">→</div>
+          <div class="stat accent"><span>压缩后</span><b id="cmpOut"></b><em id="cmpOutDim"></em></div>
+          <div class="score-pill" id="cmpScore"></div>
+        </div>
+        <button class="icon-btn" type="button" data-close title="关闭"><i data-icon="x"></i></button>
+      </header>
+      <div class="compare-stage" id="cmpStage">
+        <div class="cmp-slider" id="cmpSlider">
+          <img id="cmpAfter" alt="压缩后" draggable="false">
+          <img id="cmpBefore" alt="原图" draggable="false">
+          <div class="cmp-handle" id="cmpHandle"><span></span></div>
+          <span class="cmp-tag left">原图</span>
+          <span class="cmp-tag right">压缩后</span>
+        </div>
+        <div class="cmp-side" id="cmpSide">
+          <figure><img id="cmpSideBefore" alt="原图" draggable="false"><figcaption>原图</figcaption></figure>
+          <figure><img id="cmpSideAfter" alt="压缩后" draggable="false"><figcaption>压缩后</figcaption></figure>
+        </div>
+      </div>
+      <footer class="compare-foot" id="cmpFoot"></footer>
+    </div>
+  </div>
+
+  <div class="modal" id="dialogModal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="dialog" role="dialog" aria-modal="true">
+      <h3 id="dlgTitle"></h3>
+      <p id="dlgMessage"></p>
+      <input type="text" id="dlgInput" hidden spellcheck="false">
+      <div class="dialog-actions">
+        <button class="btn ghost" type="button" id="dlgCancel">取消</button>
+        <button class="btn primary" type="button" id="dlgOk">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+
+  <script src="../shared/naming.js"></script>
+  <script src="icons.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

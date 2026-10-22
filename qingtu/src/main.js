@@ -5,9 +5,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { INPUT_EXTS, makeThumbnail, previewBuffer } = require('./core/processor');
+const { INPUT_EXTS } = require('./core/processor');
 const { expandPaths, pathKey } = require('./core/scan');
 const { runJob } = require('./core/job');
+const { WorkerPool } = require('./core/pool');
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'qingtu', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -27,6 +28,9 @@ const knownFiles = new Set();
 const knownDirs = new Set();
 let win = null;
 let job = null;
+// 压缩任务一个池；缩略图 / 预览单独一个小池，批量处理时新加的图也能马上出缩略图
+const jobPool = new WorkerPool(Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2))));
+const lightPool = new WorkerPool(1);
 
 const statePath = () => path.join(app.getPath('userData'), 'state.json');
 const titlebarColors = () => (nativeTheme.shouldUseDarkColors ? TITLEBAR.dark : TITLEBAR.light);
@@ -80,7 +84,7 @@ async function sendExternal(argv) {
   const paths = filesFromArgv(argv);
   if (!paths.length || !win) return;
   const entries = remember(await expandPaths(paths));
-  win.webContents.send('external-files', entries);
+  if (entries.length) win.webContents.send('external-files', entries);
 }
 
 function registerProtocol() {
@@ -89,7 +93,8 @@ function registerProtocol() {
       const p = new URL(req.url).searchParams.get('p');
       assertKnown(p);
       if (BROWSER_IMAGE.has(path.extname(p).toLowerCase())) return net.fetch(pathToFileURL(p).toString());
-      return new Response(await previewBuffer(p), { headers: { 'content-type': 'image/png' } });
+      const { data } = await lightPool.run('preview', { input: p });
+      return new Response(data, { headers: { 'content-type': 'image/png' } });
     } catch (err) {
       return new Response(String(err.message || err), { status: 403 });
     }
@@ -99,12 +104,12 @@ function registerProtocol() {
 function registerIpc() {
   ipcMain.handle('pick-files', async () => {
     const r = await dialog.showOpenDialog(win, { title: '选择图片', properties: ['openFile', 'multiSelections'], filters: IMAGE_FILTER });
-    return r.canceled ? [] : remember(await expandPaths(r.filePaths));
+    return r.canceled ? null : remember(await expandPaths(r.filePaths));
   });
 
   ipcMain.handle('pick-folder', async (_e, opts) => {
     const r = await dialog.showOpenDialog(win, { title: '选择包含图片的文件夹', properties: ['openDirectory', 'multiSelections'] });
-    return r.canceled ? [] : remember(await expandPaths(r.filePaths, opts));
+    return r.canceled ? null : remember(await expandPaths(r.filePaths, opts));
   });
 
   ipcMain.handle('expand-paths', async (_e, paths, opts) => remember(await expandPaths(Array.isArray(paths) ? paths : [], opts)));
@@ -122,7 +127,7 @@ function registerIpc() {
 
   ipcMain.handle('thumbnail', (_e, p) => {
     assertKnown(p);
-    return makeThumbnail(p);
+    return lightPool.run('thumbnail', { input: p });
   });
 
   ipcMain.handle('start-job', async (e, { files, settings }) => {
@@ -134,7 +139,8 @@ function registerIpc() {
       return await runJob({
         files,
         settings,
-        concurrency: Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2))),
+        concurrency: jobPool.size,
+        compress: (input, opts) => jobPool.run('compress', { input, opts }),
         isCancelled: () => job.cancelled,
         trash: p => shell.trashItem(p),
         onProgress: ev => {
@@ -215,5 +221,10 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('window-all-closed', () => {
     if (!isMac) app.quit();
+  });
+
+  app.on('will-quit', () => {
+    jobPool.destroy();
+    lightPool.destroy();
   });
 }

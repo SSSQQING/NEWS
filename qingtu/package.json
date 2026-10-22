@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
@@ -19,5 +19,78 @@
   "devDependencies": {
     "electron": "44.5.1",
     "electron-builder": "26.17.0"
-  }
+  },
+  "build": {
+    "appId": "app.qingtu.imagecompressor",
+    "productName": "轻图",
+    "executableName": "Qingtu",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!src/**/*.map"
+    ],
+    "asarUnpack": [
+      "node_modules/sharp/**",
+      "node_modules/@img/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "artifactName": "Qingtu-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Qingtu-Portable-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.photography",
+      "icon": "build/icon.png",
+      "artifactName": "Qingtu-${version}-${arch}.${ext}",
+      "identity": "-"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Graphics",
+      "icon": "build/icon.png",
+      "artifactName": "Qingtu-${version}.${ext}"
+    }
+  },
+  "author": "Qingtu"
 }

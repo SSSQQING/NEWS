@@ -9,7 +9,7 @@ const { expandPaths } = require('../src/core/scan');
 const { renderName, sanitizeFileName } = require('../src/shared/naming');
 const { tmpDir, writePhoto } = require('./helpers');
 
-const base = { format: 'jpeg', quality: 75, limitSize: false, resize: { mode: 'none' }, naming: { mode: 'original' } };
+const base = { format: 'jpeg', qualityMode: 'manual', quality: 75, limitSize: false, resize: { mode: 'none' }, naming: { mode: 'original' } };
 
 async function setup(names) {
   const dir = tmpDir();
@@ -112,6 +112,30 @@ test('覆盖源文件且不进回收站：直接替换', async () => {
   const { done } = await run(dir, { ...base, quality: 30, output: { mode: 'overwrite', trashOriginal: false } }, { trash: () => assert.fail('不该调用回收站') });
   assert.equal(done[0].outPath, path.join(dir, 'd.jpg'));
   assert.deepEqual(fs.readdirSync(dir), ['d.jpg']);
+});
+
+test('默认智能画质：结果带感知分和编码器信息', async () => {
+  const dir = await setup(['s.jpg']);
+  const { done } = await run(dir, { format: 'webp', output: { mode: 'subfolder' } });
+  assert.equal(done[0].encoder, 'libwebp');
+  assert.ok(done[0].score >= 82, String(done[0].score));
+});
+
+test('可以换成工作线程池执行', async () => {
+  const { WorkerPool } = require('../src/core/pool');
+  const pool = new WorkerPool(2);
+  try {
+    const dir = await setup(['w1.jpg', 'w2.jpg', 'w3.jpg']);
+    const { summary, done } = await run(dir, { ...base, format: 'jxl', output: { mode: 'subfolder' } }, { compress: (input, opts) => pool.run('compress', { input, opts }) });
+    assert.equal(summary.done, 3);
+    assert.ok(done.every(d => d.outPath.endsWith('.jxl') && d.outSize > 0));
+    const thumb = await pool.run('thumbnail', { input: done[0].outPath });
+    assert.match(thumb.thumb, /^data:image\/webp;base64,/);
+    const preview = await pool.run('preview', { input: done[0].outPath });
+    assert.equal((await require('sharp')(preview.data).metadata()).format, 'png');
+  } finally {
+    await pool.destroy();
+  }
 });
 
 test('取消后不再派发新任务', async () => {

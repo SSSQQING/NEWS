@@ -1,5 +1,7 @@
-node_modules/
-release/
-dist/
 *.log
 .DS_Store
+.native-build/
+dist/
+native/ssimulacra2-wasm/target/
+node_modules/
+release/

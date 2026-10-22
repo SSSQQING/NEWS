@@ -1,0 +1,53 @@
+name: 轻图 · 测试与打包
+
+on:
+  push:
+    paths: ['qingtu/**', '.github/workflows/qingtu-build.yml']
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: qingtu
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: qingtu/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  package:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            flags: --win
+            files: qingtu/release/*.exe
+          - os: macos-latest
+            flags: --mac
+            files: qingtu/release/*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: qingtu/package-lock.json
+      - run: npm ci
+      - run: npx electron-builder ${{ matrix.flags }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qingtu-${{ runner.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error

@@ -19,11 +19,15 @@ function normalizeSettings(s = {}) {
   return {
     process: {
       format: s.format || 'original',
-      quality: Number(s.quality) || 80,
+      qualityMode: s.qualityMode === 'manual' ? 'manual' : 'smart',
+      target: s.target || 'high',
+      quality: Number(s.quality) || 85,
       maxBytes: s.limitSize && maxSize > 0 ? Math.floor(maxSize * (UNIT[s.sizeUnit] || UNIT.KB)) : 0,
       allowDownscale: s.allowDownscale !== false,
       keepMetadata: !!s.keepMetadata,
       keepSmaller: s.keepSmaller !== false,
+      keepHdr: s.keepHdr !== false,
+      jxlFromJpeg: s.jxlFromJpeg !== false,
       resize: s.resize || { mode: 'none' },
     },
     output,
@@ -121,7 +125,7 @@ function friendlyError(err) {
  * files: [{ id, path, baseDir, index }]
  * onProgress 事件：working / done / skipped / error
  */
-async function runJob({ files, settings, onProgress = () => {}, isCancelled = () => false, trash, concurrency = 2, now = new Date() }) {
+async function runJob({ files, settings, onProgress = () => {}, isCancelled = () => false, trash, compress = compressImage, concurrency = 2, now = new Date() }) {
   const s = normalizeSettings(settings);
   const overwriteMode = s.output.mode === 'overwrite';
   const allocator = new OutputAllocator(files.map(f => f.path));
@@ -132,7 +136,7 @@ async function runJob({ files, settings, onProgress = () => {}, isCancelled = ()
   async function processOne(file, i) {
     onProgress({ id: file.id, status: 'working' });
     try {
-      const r = await compressImage(file.path, s.process);
+      const r = await compress(file.path, s.process);
       const parsed = path.parse(file.path);
       const name = overwriteMode
         ? parsed.name
@@ -169,6 +173,11 @@ async function runJob({ files, settings, onProgress = () => {}, isCancelled = ()
         width: r.width,
         height: r.height,
         quality: r.quality,
+        score: r.score,
+        encoder: r.encoder,
+        lossless: r.lossless,
+        hdr: r.hdr,
+        hdrDropped: r.hdrDropped,
         format: r.format,
         ok: r.ok,
         kept: r.kept,
